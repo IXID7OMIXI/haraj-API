@@ -118,6 +118,26 @@ MAX_REQUESTS_PER_TAG = 500
 
 ---
 
+### 7. `CLIENT_ID` - Haraj API Client ID
+
+```python
+CLIENT_ID = "qQGfZHPh-wko1-6XYa-TFfK-namWpCJ6MW1xv3"
+```
+
+**What it does:** Authentication token for Haraj's GraphQL API.
+
+**⚠️ Important:** Each user should get their own client ID to avoid shared rate-limiting.
+
+**How to get your own client ID:**
+1. Go to [https://haraj.com.sa](https://haraj.com.sa) in your browser
+2. Open Developer Tools (press `F12`)
+3. Go to the **Network** tab
+4. Search for any listing or browse a category on the site
+5. Look for requests to `graphql.haraj.com.sa`
+6. Find the `clientId` parameter in the URL and copy its value
+
+---
+
 ## Running the Script
 
 ```bash

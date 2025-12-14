@@ -11,12 +11,13 @@ from config import (
     KEYWORDS,
     SLEEP_SECONDS_BETWEEN_REQUESTS,
     MAX_REQUESTS_PER_TAG,
+    CLIENT_ID,
 )
 
 API_URL = (
     "https://graphql.haraj.com.sa/"
     "?queryName=posts"
-    "&clientId=qQGfZHPh-wko1-6XYa-TFfK-namWpCJ6MW1xv3"
+    f"&clientId={CLIENT_ID}"
     "&version=N0.0.1%20,%202025-12-11%2015/"
 )
 
