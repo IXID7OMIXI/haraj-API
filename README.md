@@ -1,6 +1,6 @@
 # Haraj API Scraper
 
-A Python script to scrape car listings from [Haraj.com.sa](https://haraj.com.sa) (Saudi Arabia's largest classified ads marketplace).
+A Python script to scrape car listings from [Haraj.com.sa](https://haraj.com.sa)
 
 ## Requirements
 
