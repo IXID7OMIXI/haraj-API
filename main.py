@@ -12,6 +12,7 @@ from config import (
     SLEEP_SECONDS_BETWEEN_REQUESTS,
     MAX_REQUESTS_PER_TAG,
     CLIENT_ID,
+    GEAR_FILTER,
 )
 
 API_URL = (
@@ -44,6 +45,15 @@ query FetchAds($tag: String = null, $limit: Int = null, $page: Int = null, $befo
       bodyTEXT
       postDate
       updateDate
+      carInfo {
+        gear
+        model
+        mileage
+        fuel
+      }
+      price {
+        formattedPrice
+      }
     }
     pageInfo {
       hasNextPage
@@ -57,6 +67,39 @@ def contains_keywords(title: Optional[str], desc: Optional[str], keywords: List[
         return True  # filter disabled
     hay = ((title or "") + "\n" + (desc or "")).lower()
     return any(k.lower() in hay for k in keywords)
+
+def matches_gear_filter(p: Dict[str, Any], gear_filter: Optional[str], keywords: List[str]) -> bool:
+    """
+    Check if a post matches the gear filter.
+    
+    Args:
+        p: Post data from API
+        gear_filter: "MANUAL", "AUTO", or None (no filter)
+        keywords: Fallback keywords to search if carInfo.gear is missing
+    
+    Returns:
+        True if post matches filter, False otherwise
+    """
+    # No filter = accept all
+    if gear_filter is None:
+        return True
+    
+    # Check carInfo.gear field first (most reliable)
+    car_info = p.get("carInfo")
+    if car_info and isinstance(car_info, dict):
+        gear = car_info.get("gear")
+        if gear == gear_filter:
+            return True
+        # If gear is set but doesn't match, reject (unless we want to check keywords)
+        if gear is not None:
+            return False
+    
+    # carInfo.gear is missing - fall back to keyword search
+    if keywords:
+        return contains_keywords(p.get("title"), p.get("bodyTEXT"), keywords)
+    
+    # No gear info and no keywords - can't determine, reject
+    return False
 
 def clean_item(p: Dict[str, Any]) -> Dict[str, Any]:
     # NOTE (explicit assumption):
@@ -72,6 +115,10 @@ def clean_item(p: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(post_date_ts, int):
         post_date_str = datetime.fromtimestamp(post_date_ts).strftime("%Y-%m-%d %H:%M:%S")
 
+    # Extract carInfo fields
+    car_info = p.get("carInfo") or {}
+    price_info = p.get("price") or {}
+
     return {
         "id": p.get("id"),
         "url": full_url,
@@ -80,6 +127,11 @@ def clean_item(p: Dict[str, Any]) -> Dict[str, Any]:
         "tags": p.get("tags") if isinstance(p.get("tags"), list) else [],
         "description": p.get("bodyTEXT"),
         "postDate": post_date_str,
+        "price": price_info.get("formattedPrice"),
+        "gear": car_info.get("gear"),
+        "model_year": car_info.get("model"),
+        "mileage": car_info.get("mileage"),
+        "fuel": car_info.get("fuel"),
     }
 
 def fetch_page(tag: str, limit: int, page: int, before_post_date: Optional[int] = None) -> Dict[str, Any]:
@@ -102,6 +154,7 @@ def fetch_page(tag: str, limit: int, page: int, before_post_date: Optional[int] 
 def collect_for_tag(tag: str) -> List[Dict[str, Any]]:
     collected: List[Dict[str, Any]] = []
     seen_ids: Set[int] = set()
+    total_scanned = 0  # Track how many posts we scanned
 
     limit = 50  # batch size per request
     # HYBRID PAGINATION:
@@ -114,11 +167,11 @@ def collect_for_tag(tag: str) -> List[Dict[str, Any]]:
 
     for req_i in range(MAX_REQUESTS_PER_TAG):
         cursor_str = f" | cursor={cursor}" if cursor else ""
-        print(f"\r  Page {page}{cursor_str} | Collected: {len(collected)}/{TARGET_PER_TAG} posts | Fetching...", end="", flush=True)
+        print(f"\r  Page {page}{cursor_str} | Scanned: {total_scanned} | Matched: {len(collected)}/{TARGET_PER_TAG} | Fetching...", end="", flush=True)
 
         data = fetch_page(tag=tag, limit=limit, page=page, before_post_date=cursor)
 
-        print(f"\r  Page {page}{cursor_str} | Collected: {len(collected)}/{TARGET_PER_TAG} posts | Done         ", end="", flush=True)
+        print(f"\r  Page {page}{cursor_str} | Scanned: {total_scanned} | Matched: {len(collected)}/{TARGET_PER_TAG} | Done         ", end="", flush=True)
 
         posts = data["data"]["posts"]
         items = posts["items"]
@@ -146,12 +199,15 @@ def collect_for_tag(tag: str) -> List[Dict[str, Any]]:
 
             if pid in seen_ids:
                 continue
+            
+            seen_ids.add(pid)
+            total_scanned += 1
 
-            cleaned = clean_item(p)
-            if not contains_keywords(cleaned.get("title"), cleaned.get("description"), KEYWORDS):
+            # Apply gear filter (MANUAL, AUTO, or None for all)
+            if not matches_gear_filter(p, GEAR_FILTER, KEYWORDS):
                 continue
 
-            seen_ids.add(pid)
+            cleaned = clean_item(p)
             collected.append(cleaned)
             new_in_batch += 1
 
@@ -202,22 +258,37 @@ def collect_for_tag(tag: str) -> List[Dict[str, Any]]:
 
         time.sleep(SLEEP_SECONDS_BETWEEN_REQUESTS)
 
-    return collected
+    return collected, total_scanned
 
 def main():
+    # Show filter settings
+    if GEAR_FILTER:
+        print(f"🔍 Gear filter: {GEAR_FILTER}")
+    else:
+        print("🔍 Gear filter: None (all cars)")
+    print()
+    
     all_results: List[Dict[str, Any]] = []
+    total_scanned_all = 0
     for tag in TAGS:
         print(f"Collecting tag={tag!r} ...")
-        results = collect_for_tag(tag)
+        results, scanned = collect_for_tag(tag)
+        total_scanned_all += scanned
         # Print newline to move past the \r progress line, then show final count
-        print(f"\n  ✓ Finished: {len(results)} unique posts")
+        print(f"\n  ✓ Finished: {len(results)} matches out of {scanned} scanned")
         all_results.extend(results)
 
     # Save cleaned JSON (Arabic preserved)
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(all_results, f, ensure_ascii=False, indent=2)  # keep Arabic readable [web:316]
 
-    print(f"Saved total {len(all_results)} posts to {OUT_FILE}")
+    print(f"\n{'='*50}")
+    print(f"Gear filter: {GEAR_FILTER or 'None'}")
+    print(f"Total scanned: {total_scanned_all} posts")
+    print(f"Total matched: {len(all_results)} posts")
+    if total_scanned_all > 0:
+        print(f"Match rate: {len(all_results)/total_scanned_all*100:.1f}%")
+    print(f"Saved to: {OUT_FILE}")
 
 if __name__ == "__main__":
     main()
