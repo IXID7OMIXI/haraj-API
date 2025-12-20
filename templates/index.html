@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Haraj Scraper UI</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="logo">
+          <h2>Haraj Explorer</h2>
+        </div>
+
+        <div class="filter-group">
+          <label>Search Tag</label>
+          <input
+            type="text"
+            id="tagInput"
+            placeholder="e.g. بي ام دبليو"
+            value="بي ام دبليو"
+          />
+        </div>
+
+        <div class="filter-group">
+          <label>Transmission</label>
+          <div class="radio-group">
+            <label class="radio-card">
+              <input type="radio" name="gear" value="" checked />
+              <span>All</span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="gear" value="MANUAL" />
+              <span>Manual</span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="gear" value="AUTO" />
+              <span>Auto</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label>Keywords (comma separated)</label>
+          <input
+            type="text"
+            id="keywordsInput"
+            placeholder="e.g. turbo, sport"
+          />
+        </div>
+
+        <button id="searchBtn" class="primary-btn">Search</button>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="content">
+        <header class="top-bar">
+          <h1>Results</h1>
+          <span id="status">Ready</span>
+        </header>
+
+        <div id="resultsGrid" class="grid">
+          <!-- Cards will be injected here -->
+        </div>
+
+        <div class="load-more-container">
+          <button id="loadMoreBtn" class="secondary-btn hidden">
+            Load More
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>
